@@ -8,11 +8,17 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #fff; color: #262626; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 .wrap { max-width: 420px; margin: 0 auto; }
-header { padding: 16px; display: flex; align-items: center; gap: 20px; }
-.avatar { width: 72px; height: 72px; border-radius: 50%; background: #efefef; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 600; border: 1px solid #dbdbdb; flex: none; }
-.stats strong { display: block; font-size: 16px; text-align: center; }
-.stats { font-size: 13px; text-align: center; }
-.name { padding: 0 16px 6px; font-size: 14px; font-weight: 600; }
+.top { padding: 12px 16px 4px; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+header { padding: 8px 16px 10px; display: flex; align-items: center; gap: 22px; }
+.avatar { width: 80px; height: 80px; border-radius: 50%; background: #efefef center/cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 600; border: 1px solid #dbdbdb; flex: none; }
+.stats { display: flex; flex: 1; justify-content: space-around; font-size: 13px; text-align: center; }
+.stats strong { display: block; font-size: 16px; }
+.name { padding: 0 16px 2px; font-size: 14px; font-weight: 600; }
+.bio { padding: 0 16px 10px; font-size: 14px; line-height: 1.35; white-space: pre-wrap; }
+.hl { display: flex; gap: 14px; overflow-x: auto; padding: 4px 16px 14px; }
+.hl div { flex: none; width: 66px; text-align: center; font-size: 12px; }
+.hl i { display: block; width: 62px; height: 62px; margin: 0 auto 5px; border-radius: 50%; border: 2px solid #dbdbdb; background: #efefef center/cover no-repeat; box-shadow: inset 0 0 0 2px #fff; }
+.hl span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hint { padding: 0 16px 10px; font-size: 11px; color: #8e8e8e; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; border-top: 1px solid #efefef; }
 .cell { position: relative; aspect-ratio: 4 / 5; background: #f2f2f2; cursor: pointer; overflow: hidden; }
@@ -38,11 +44,14 @@ header { padding: 16px; display: flex; align-items: center; gap: 20px; }
 </head>
 <body>
 <div class="wrap">
+  <div class="top" id="user"></div>
   <header>
     <div class="avatar" id="avatar">.</div>
-    <div class="stats"><strong id="count">0</strong>posts</div>
+    <div class="stats"><div><strong id="count">0</strong>berichten</div><div id="fw" hidden><strong id="followers"></strong>volgers</div><div id="fg" hidden><strong id="following"></strong>volgend</div></div>
   </header>
   <div class="name" id="name"></div>
+  <div class="bio" id="bio" hidden></div>
+  <div class="hl" id="hl" hidden></div>
   <div class="hint" id="hint" hidden>Sleep een post naar een andere plek om de datums te wisselen in de contentkalender.</div>
   <div class="grid" id="grid"></div>
   <div class="msg" id="msg">Laden...</div>
@@ -92,9 +101,24 @@ function openPost(p) {
 document.getElementById("close").onclick = () => document.getElementById("modal").classList.remove("open");
 document.getElementById("modal").onclick = (e) => { if (e.target.id === "modal") e.target.classList.remove("open"); };
 
+let postsTotal = null;
+const fmt = (n) => Number(n).toLocaleString("nl-BE");
+function showProfile(p) {
+  document.getElementById("user").textContent = (p && p.username) || name;
+  if (!p) return;
+  if (p.name) document.getElementById("name").textContent = p.name;
+  if (p.photo) { const a = document.getElementById("avatar"); a.style.backgroundImage = "url('" + p.photo + "')"; a.textContent = ""; }
+  if (p.bio) { const b = document.getElementById("bio"); b.textContent = p.bio; b.hidden = false; }
+  if (p.followers != null) { document.getElementById("followers").textContent = fmt(p.followers); document.getElementById("fw").hidden = false; }
+  if (p.following != null) { document.getElementById("following").textContent = fmt(p.following); document.getElementById("fg").hidden = false; }
+  postsTotal = p.posts;
+  const hl = document.getElementById("hl"); hl.innerHTML = "";
+  (p.highlights || []).forEach((h) => { const d = el("div"); const i = el("i"); if (h.img) i.style.backgroundImage = "url('" + h.img + "')"; const sp = el("span"); sp.textContent = h.name; d.append(i, sp); hl.appendChild(d); });
+  hl.hidden = !(p.highlights || []).length;
+}
 function render() {
   grid.innerHTML = "";
-  document.getElementById("count").textContent = posts.length;
+  document.getElementById("count").textContent = postsTotal != null ? fmt(postsTotal) : posts.length;
   posts.forEach((p) => {
     const c = el("div", "cell"); c.dataset.id = p.id;
     if (p.files[0]) c.appendChild(mediaEl(p.files[0]));
@@ -114,6 +138,7 @@ async function load() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Fout");
     posts = data.posts;
+    showProfile(data.profile);
     render();
     msg.hidden = true;
     if (key && window.Sortable) enableDrag();
@@ -127,6 +152,7 @@ function enableDrag() {
     animation: 150, delay: 150, delayOnTouchOnly: true, ghostClass: "sortable-ghost",
     onEnd: async () => {
       const newOrder = [...grid.children].map((c) => posts.find((p) => p.id === c.dataset.id));
+      // de datums blijven op dezelfde plaatsen in het raster; de posts verschuiven
       const updates = [];
       newOrder.forEach((p, i) => {
         const slot = posts[i];
@@ -146,7 +172,7 @@ function enableDrag() {
     },
   });
 }
-async function load2() {
+async function load2() { // herlaad de volgorde na opslaan, zonder meldingen te wissen
   const keep = msg.textContent, cls = msg.className;
   const r = await fetch(FQ); const d = await r.json();
   if (r.ok) { posts = d.posts; render(); }
