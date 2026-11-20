@@ -10,34 +10,40 @@ body { margin: 0; background: #fff; color: #262626; font-family: -apple-system, 
 .wrap { max-width: 420px; margin: 0 auto; }
 header { padding: 16px; display: flex; align-items: center; gap: 20px; }
 .avatar { width: 72px; height: 72px; border-radius: 50%; background: #efefef; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 600; border: 1px solid #dbdbdb; flex: none; }
-.stats { display: flex; gap: 18px; text-align: center; font-size: 13px; }
-.stats strong { display: block; font-size: 16px; }
-.name { padding: 0 16px 12px; font-size: 14px; font-weight: 600; }
+.stats strong { display: block; font-size: 16px; text-align: center; }
+.stats { font-size: 13px; text-align: center; }
+.name { padding: 0 16px 6px; font-size: 14px; font-weight: 600; }
+.hint { padding: 0 16px 10px; font-size: 11px; color: #8e8e8e; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; border-top: 1px solid #efefef; }
 .cell { position: relative; aspect-ratio: 4 / 5; background: #f2f2f2; cursor: pointer; overflow: hidden; }
-.cell img, .cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.edit .cell { cursor: grab; }
+.cell img, .cell video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: #8e8e8e; }
 .badge { position: absolute; top: 6px; right: 6px; color: #fff; font-size: 14px; text-shadow: 0 0 4px rgba(0,0,0,.6); }
 .dot { position: absolute; bottom: 5px; left: 5px; font-size: 10px; background: rgba(255,255,255,.9); border-radius: 8px; padding: 1px 6px; }
+.sortable-ghost { opacity: .35; }
+.saving { opacity: .6; pointer-events: none; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 12px; }
 .modal.open { display: flex; }
 .card { background: #fff; border-radius: 12px; max-width: 400px; width: 100%; max-height: 92vh; overflow: auto; }
-.card .media { background: #000; }
-.card .media img, .card .media video { width: 100%; display: block; }
-.card .body { padding: 14px 16px 18px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.media { background: #000; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+.media > * { flex: none; width: 100%; scroll-snap-align: center; display: block; }
+.body { padding: 14px 16px 18px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
 .meta { color: #8e8e8e; font-size: 12px; margin-bottom: 8px; }
 .extra { margin-top: 12px; padding: 10px 12px; background: #fff8e1; border-radius: 8px; font-size: 13px; }
 .close { float: right; border: 0; background: none; font-size: 22px; cursor: pointer; }
-.msg { padding: 24px 16px; text-align: center; color: #8e8e8e; font-size: 13px; }
+.msg { padding: 14px 16px; text-align: center; color: #8e8e8e; font-size: 13px; }
+.msg.err { color: #c0392b; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="avatar" id="avatar">.</div>
-    <div class="stats"><div><strong id="count">0</strong>posts</div></div>
+    <div class="stats"><strong id="count">0</strong>posts</div>
   </header>
   <div class="name" id="name"></div>
+  <div class="hint" id="hint" hidden>Sleep een post naar een andere plek om de datums te wisselen in de contentkalender.</div>
   <div class="grid" id="grid"></div>
   <div class="msg" id="msg">Laden...</div>
 </div>
@@ -52,23 +58,30 @@ header { padding: 16px; display: flex; align-items: center; gap: 20px; }
     </div>
   </div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
 const name = q.get("name") || "";
+const db = q.get("db");
+const key = q.get("key");
 document.getElementById("name").textContent = name;
 document.getElementById("avatar").textContent = (name[0] || ".").toUpperCase();
 const isVideo = (f) => /\.(mp4|mov|webm)(\?|$)/i.test(f.name || f.url);
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h) e.innerHTML = h; return e; };
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const msg = document.getElementById("msg");
+const grid = document.getElementById("grid");
+let posts = [];
+
 function mediaEl(f, controls) {
   if (isVideo(f)) { const v = el("video"); v.src = f.url; v.muted = true; v.playsInline = true; v.controls = !!controls; v.preload = "metadata"; return v; }
   const i = el("img"); i.src = f.url; i.loading = "lazy"; return i;
 }
 function openPost(p) {
   const m = document.getElementById("mMedia"); m.innerHTML = "";
-  if (p.files[0]) m.appendChild(mediaEl(p.files[0], true));
+  p.files.forEach((f) => m.appendChild(mediaEl(f, true)));
   const d = p.date ? new Date(p.date).toLocaleDateString("nl-BE", { day: "numeric", month: "long", year: "numeric" }) : "";
-  document.getElementById("mMeta").textContent = [d, p.format, p.status].filter(Boolean).join(" - ");
+  document.getElementById("mMeta").textContent = [d, p.format, p.status, p.files.length > 1 ? "veeg voor meer" : ""].filter(Boolean).join(" - ");
   document.getElementById("mCaption").innerHTML = "<strong>" + esc(name) + "</strong> " + esc(p.caption || p.title || "");
   const x = document.getElementById("mExtra");
   x.hidden = !p.extra; x.innerHTML = p.extra ? "<strong>Extra info:</strong> " + esc(p.extra) : "";
@@ -76,28 +89,66 @@ function openPost(p) {
 }
 document.getElementById("close").onclick = () => document.getElementById("modal").classList.remove("open");
 document.getElementById("modal").onclick = (e) => { if (e.target.id === "modal") e.target.classList.remove("open"); };
+
+function render() {
+  grid.innerHTML = "";
+  document.getElementById("count").textContent = posts.length;
+  posts.forEach((p) => {
+    const c = el("div", "cell"); c.dataset.id = p.id;
+    if (p.files[0]) c.appendChild(mediaEl(p.files[0]));
+    else c.appendChild(el("div", "ph", esc(p.title || "Nog geen visual")));
+    if (p.files.length > 1) c.appendChild(el("span", "badge", "&#10064;"));
+    else if (p.format === "Video" || p.format === "Reel") c.appendChild(el("span", "badge", "&#9654;"));
+    if (p.status && !/Gepost|Ingepland|online|Gefactureerd/i.test(p.status)) c.appendChild(el("span", "dot", "concept"));
+    c.onclick = () => openPost(p);
+    grid.appendChild(c);
+  });
+}
+
 async function load() {
-  const db = q.get("db");
-  const msg = document.getElementById("msg");
   if (!db) { msg.textContent = "Geef ?db=<database-id> mee in de link."; return; }
   try {
     const r = await fetch("/api/feed?db=" + encodeURIComponent(db));
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Fout");
-    const grid = document.getElementById("grid");
-    document.getElementById("count").textContent = data.posts.length;
-    data.posts.forEach((p) => {
-      const c = el("div", "cell");
-      if (p.files[0]) c.appendChild(mediaEl(p.files[0]));
-      else c.appendChild(el("div", "ph", esc(p.title || "Nog geen visual")));
-      if (p.files.length > 1) c.appendChild(el("span", "badge", "&#10064;"));
-      else if (p.format === "Video" || p.format === "Reel") c.appendChild(el("span", "badge", "&#9654;"));
-      if (p.status && !/Gepost|Ingepland|online|Gefactureerd/i.test(p.status)) c.appendChild(el("span", "dot", "concept"));
-      c.onclick = () => openPost(p);
-      grid.appendChild(c);
-    });
+    posts = data.posts;
+    render();
     msg.hidden = true;
-  } catch (e) { msg.textContent = "Kon de posts niet laden: " + e.message; }
+    if (key && window.Sortable) enableDrag();
+  } catch (e) { msg.className = "msg err"; msg.textContent = "Kon de posts niet laden: " + e.message; }
+}
+
+function enableDrag() {
+  document.body.classList.add("edit");
+  document.getElementById("hint").hidden = false;
+  Sortable.create(grid, {
+    animation: 150, delay: 150, delayOnTouchOnly: true, ghostClass: "sortable-ghost",
+    onEnd: async () => {
+      const newOrder = [...grid.children].map((c) => posts.find((p) => p.id === c.dataset.id));
+      const updates = [];
+      newOrder.forEach((p, i) => {
+        const slot = posts[i];
+        if (p.id !== slot.id) updates.push({ id: p.id, date: slot.dateObj });
+      });
+      if (!updates.length) return;
+      if (updates.length > 40) { msg.hidden = false; msg.className = "msg err"; msg.textContent = "Te veel posts tegelijk verschoven. Verplaats een kleinere afstand."; await load(); return; }
+      grid.classList.add("saving"); msg.hidden = false; msg.className = "msg"; msg.textContent = "Opslaan in Notion...";
+      try {
+        const r = await fetch("/api/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ db, key, updates }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Fout");
+        msg.textContent = "Opgeslagen in de contentkalender.";
+      } catch (e) { msg.className = "msg err"; msg.textContent = "Niet opgeslagen: " + e.message; }
+      grid.classList.remove("saving");
+      await load2();
+    },
+  });
+}
+async function load2() {
+  const keep = msg.textContent, cls = msg.className;
+  const r = await fetch("/api/feed?db=" + encodeURIComponent(db)); const d = await r.json();
+  if (r.ok) { posts = d.posts; render(); }
+  msg.textContent = keep; msg.className = cls; msg.hidden = false;
 }
 load();
 </script>

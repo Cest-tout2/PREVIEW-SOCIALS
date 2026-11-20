@@ -46,12 +46,13 @@ module.exports = async function handler(req, res) {
         format: pr["Format"]?.select?.name || "",
         status: byType("status")?.status?.name || "",
         date: pr["Date"]?.date?.start || "",
+        dateObj: pr["Date"]?.date || null,
         files,
       };
     });
     if (!showAll) posts = posts.filter((p) => p.files.length > 0);
     posts = posts.slice(0, 60);
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(200).json({ posts });
   } catch (e) {
