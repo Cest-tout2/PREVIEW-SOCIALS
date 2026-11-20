@@ -126,7 +126,6 @@ function render() {
     else c.appendChild(el("div", "ph", esc(p.title || "Nog geen visual")));
     if (p.files.length > 1) c.appendChild(el("span", "badge", "&#10064;"));
     else if (p.format === "Video" || p.format === "Reel") c.appendChild(el("span", "badge", "&#9654;"));
-    if (p.status && !/Gepost|Ingepland|online|Gefactureerd/i.test(p.status)) c.appendChild(el("span", "dot", "concept"));
     c.onclick = () => openPost(p);
     grid.appendChild(c);
   });
