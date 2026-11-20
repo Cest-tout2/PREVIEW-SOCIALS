@@ -1,3 +1,4 @@
+const { viewOk } = require("../lib/key");
 const NOTION_VERSION = "2022-06-28";
 const plain = (rich = []) => rich.map((t) => t.plain_text).join("");
 
@@ -5,6 +6,7 @@ module.exports = async function handler(req, res) {
   const token = process.env.NOTION_TOKEN;
   const db = (req.query.db || process.env.DEFAULT_DB_ID || "").replace(/-/g, "");
   const showAll = req.query.all === "1";
+  if (!viewOk(db, req.query.vk, req.query.key)) return res.status(401).json({ error: "Deze link is niet geldig. Vraag een nieuwe link aan het team." });
   if (!token) return res.status(500).json({ error: "NOTION_TOKEN ontbreekt in Vercel" });
   if (!db) return res.status(400).json({ error: "Geef ?db=<database-id> mee" });
   try {

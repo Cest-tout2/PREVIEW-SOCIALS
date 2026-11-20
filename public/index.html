@@ -64,6 +64,8 @@ const q = new URLSearchParams(location.search);
 const name = q.get("name") || "";
 const db = q.get("db");
 const key = q.get("key");
+const vk = q.get("vk");
+const FQ = "/api/feed?db=" + encodeURIComponent(db) + (vk ? "&vk=" + encodeURIComponent(vk) : "") + (key ? "&key=" + encodeURIComponent(key) : "");
 document.getElementById("name").textContent = name;
 document.getElementById("avatar").textContent = (name[0] || ".").toUpperCase();
 const isVideo = (f) => /\.(mp4|mov|webm)(\?|$)/i.test(f.name || f.url);
@@ -108,7 +110,7 @@ function render() {
 async function load() {
   if (!db) { msg.textContent = "Geef ?db=<database-id> mee in de link."; return; }
   try {
-    const r = await fetch("/api/feed?db=" + encodeURIComponent(db));
+    const r = await fetch(FQ);
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Fout");
     posts = data.posts;
@@ -146,7 +148,7 @@ function enableDrag() {
 }
 async function load2() {
   const keep = msg.textContent, cls = msg.className;
-  const r = await fetch("/api/feed?db=" + encodeURIComponent(db)); const d = await r.json();
+  const r = await fetch(FQ); const d = await r.json();
   if (r.ok) { posts = d.posts; render(); }
   msg.textContent = keep; msg.className = cls; msg.hidden = false;
 }

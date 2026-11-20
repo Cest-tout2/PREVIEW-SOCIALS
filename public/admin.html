@@ -19,6 +19,6 @@ document.getElementById("b").onclick=async()=>{
  const r=await fetch("/api/key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({secret:document.getElementById("s").value,db})});
  const j=await r.json();if(!r.ok){o.textContent=j.error||"Fout";return;}
  const base=location.origin+"/?db="+db+"&name="+encodeURIComponent(name);
- o.innerHTML="<div><b>Alleen kijken</b> (voor de klant)<br>"+base+"</div><div><b>Kijken en slepen</b> (voor het team)<br>"+base+"&key="+j.key+"</div>";
+ o.innerHTML="<div><b>Alleen kijken</b> (voor de klant)<br>"+base+"&vk="+j.view+"</div><div><b>Kijken en slepen</b> (voor het team)<br>"+base+"&key="+j.key+"</div>";
 };
 </script></body></html>
