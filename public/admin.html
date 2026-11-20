@@ -1,24 +1,58 @@
 <!DOCTYPE html>
 <html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Links maken</title>
-<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:30px auto;padding:0 16px;color:#262626}
-label{display:block;margin-top:14px;font-size:13px;font-weight:600}input{width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px}
+<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:30px auto;padding:0 16px;color:#262626}
+label{display:block;margin-top:14px;font-size:13px;font-weight:600}input{width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box}
 button{margin-top:16px;padding:10px 16px;border:0;border-radius:6px;background:#111;color:#fff;font-size:14px;cursor:pointer}
-.out{margin-top:20px;font-size:13px;word-break:break-all}.out div{margin-bottom:14px;padding:10px;background:#f6f6f6;border-radius:6px}</style></head>
+.out{margin-top:20px;font-size:13px;word-break:break-all}.out div{margin-bottom:14px;padding:10px;background:#f6f6f6;border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:12px;margin-top:16px}td,th{border-bottom:1px solid #eee;padding:6px;text-align:left;vertical-align:top;word-break:break-all}
+h3{margin-top:36px}</style></head>
 <body><h2>Preview-links maken</h2>
 <p style="font-size:13px;color:#666">Vul het beheerderswachtwoord in (SWAP_SECRET uit Vercel). Dit wachtwoord deel je niet met klanten.</p>
 <label>Beheerderswachtwoord</label><input id="s" type="password" autocomplete="off">
+
+<h3>Alle klanten in één keer</h3>
+<button id="all">Maak links voor alle klanten</button>
+<table id="t"></table>
+
+<h3>Eén nieuwe klant</h3>
 <label>Naam klant</label><input id="n" placeholder="Eye-C">
-<label>Database-ID van de contentkalender</label><input id="d" placeholder="1d0e7a32289e81dbae4ff177da324820">
+<label>Database-ID of link van de contentkalender</label><input id="d" placeholder="1d0e7a32289e81dbae4ff177da324820">
 <button id="b">Maak links</button>
 <div class="out" id="o"></div>
 <script>
+const KLANTEN=[
+["Eye-C","1d0e7a32289e81dbae4ff177da324820"],["Assurmer","1c1e7a32289e81aa9faafaea9ce8d6c0"],["Taverlani","22de7a32289e81e0a425d9378dedf9cb"],
+["Van de Voorde Drankenhandel","2a4e7a32289e8119bc1ad1a11f0d8010"],["De Wikkelaar","30ae7a32289e817fb957cba245edeaf6"],["Esthetiek Pur'o","31be7a32289e812aa912f87b3257b3ae"],
+["La Beauté d'Ana","344e7a32289e8139ad9de9356d3ddb3c"],["Lauretum","306e7a32289e811ba269e1b1dbd6db33"],["Osteo Steelant","31ee7a32289e834dbf7301f215714a61"],
+["Digitale Toonbank","295e7a32289e8115bf80f5a0902bbd18"],["Travel Well","317e7a32289e8174869aec29f23d4454"],["Alainprovist","1dce7a32289e811d97eceaaa1fec624b"],
+["Umeoffice","29ae7a32289e81c99318dcbb66e7b230"],["Hanneb","326e7a32289e81ceb861cf9667fe27f9"],["Bistro Dampierre","238e7a32289e81ec99acf5c7fd8b62d9"],
+["Lingerie Ilse","1d0e7a32289e81ba8eb7ff10190881a7"],["Cambridge","313e7a32289e81de9d61dcab2102577c"],["Bistro Jul","29de7a32289e81c180a0dcc15cdd01d9"],
+["Eventplanner Astrid","1d6e7a32289e80639279f0c80724094d"],["Salon Syzo","31be7a32289e810c8486f1a2537d0aaa"],["Charlotte Goesaert","696e7a32289e821aad4701b6b21aeefb"],
+["The View","36ae7a32289e82eeb6b70174fc503af9"],["Beaumé","bd4e7a32289e83bfaea381c26d47c016"],["Mermuys","3dbe7a32289e8011869ee4b5820cfbcf"],
+["Selene","547e7a32289e82b5aa9901e06583d18d"]];
+const secret=()=>document.getElementById("s").value;
+async function links(name,db){
+ const r=await fetch("/api/key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({secret:secret(),db})});
+ const j=await r.json();if(!r.ok)throw new Error(j.error||"Fout");
+ const base=location.origin+"/?db="+db+"&name="+encodeURIComponent(name);
+ return {view:base+"&vk="+j.view,edit:base+"&key="+j.key};
+}
+document.getElementById("all").onclick=async()=>{
+ const t=document.getElementById("t");t.innerHTML="<tr><td>Bezig...</td></tr>";
+ let rows="<tr><th>Klant</th><th>Database</th><th>Kijken en slepen</th><th>Alleen kijken</th></tr>";
+ for(const [name,db] of KLANTEN){
+  try{const l=await links(name,db);rows+="<tr data-klant><td>"+name+"</td><td>"+db+"</td><td>"+l.edit+"</td><td>"+l.view+"</td></tr>";}
+  catch(e){t.innerHTML="<tr><td>"+e.message+"</td></tr>";return;}
+ }
+ t.innerHTML=rows;
+};
 document.getElementById("b").onclick=async()=>{
  const o=document.getElementById("o");o.textContent="Bezig...";
- const db=document.getElementById("d").value.replace(/[^0-9a-f]/gi,"").slice(0,32),name=document.getElementById("n").value.trim();
- const r=await fetch("/api/key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({secret:document.getElementById("s").value,db})});
- const j=await r.json();if(!r.ok){o.textContent=j.error||"Fout";return;}
- const base=location.origin+"/?db="+db+"&name="+encodeURIComponent(name);
- o.innerHTML="<div><b>Alleen kijken</b> (voor de klant)<br>"+base+"&vk="+j.view+"</div><div><b>Kijken en slepen</b> (voor het team)<br>"+base+"&key="+j.key+"</div>";
+ const ids=document.getElementById("d").value.match(/[0-9a-f]{32}/gi)||[document.getElementById("d").value.replace(/[^0-9a-f]/gi,"")];
+ const db=ids[ids.length-1].slice(0,32),name=document.getElementById("n").value.trim();
+ try{const l=await links(name,db);
+ o.innerHTML="<div><b>Alleen kijken</b><br>"+l.view+"</div><div><b>Kijken en slepen</b><br>"+l.edit+"</div>";}
+ catch(e){o.textContent=e.message;}
 };
 </script></body></html>
