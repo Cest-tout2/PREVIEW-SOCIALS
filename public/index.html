@@ -85,7 +85,7 @@ const grid = document.getElementById("grid");
 let posts = [];
 
 function mediaEl(f, controls) {
-  if (isVideo(f)) { const v = el("video"); v.src = f.url; v.muted = true; v.playsInline = true; v.controls = !!controls; v.preload = "metadata"; return v; }
+  if (isVideo(f)) { const v = el("video"); v.src = f.url + (controls ? "" : "#t=0.5"); v.muted = true; v.playsInline = true; v.controls = !!controls; v.preload = "metadata"; return v; }
   const i = el("img"); i.src = f.url; i.loading = "lazy"; return i;
 }
 function openPost(p) {
@@ -93,7 +93,7 @@ function openPost(p) {
   p.files.forEach((f) => m.appendChild(mediaEl(f, true)));
   const d = p.date ? new Date(p.date).toLocaleDateString("nl-BE", { day: "numeric", month: "long", year: "numeric" }) : "";
   document.getElementById("mMeta").textContent = [d, p.format, p.status, p.files.length > 1 ? "veeg voor meer" : ""].filter(Boolean).join(" - ");
-  document.getElementById("mCaption").innerHTML = "<strong>" + esc(name) + "</strong> " + esc(p.caption || p.title || "");
+  document.getElementById("mCaption").innerHTML = "<strong>" + esc(uname || name) + "</strong> " + esc(p.caption || p.title || "");
   const x = document.getElementById("mExtra");
   x.hidden = !p.extra; x.innerHTML = p.extra ? "<strong>Extra info:</strong> " + esc(p.extra) : "";
   document.getElementById("modal").classList.add("open");
@@ -101,11 +101,12 @@ function openPost(p) {
 document.getElementById("close").onclick = () => document.getElementById("modal").classList.remove("open");
 document.getElementById("modal").onclick = (e) => { if (e.target.id === "modal") e.target.classList.remove("open"); };
 
-let postsTotal = null;
+let postsTotal = null, uname = "";
 const fmt = (n) => Number(n).toLocaleString("nl-BE");
 function showProfile(p) {
   document.getElementById("user").textContent = (p && p.username) || name;
   if (!p) return;
+  uname = p.username || "";
   if (p.name) document.getElementById("name").textContent = p.name;
   if (p.photo) { const a = document.getElementById("avatar"); a.style.backgroundImage = "url('" + p.photo + "')"; a.textContent = ""; }
   if (p.bio) { const b = document.getElementById("bio"); b.textContent = p.bio; b.hidden = false; }
