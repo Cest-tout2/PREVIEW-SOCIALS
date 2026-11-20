@@ -4,24 +4,33 @@ const plain = (rich = []) => rich.map((t) => t.plain_text).join("");
 module.exports = async function handler(req, res) {
   const token = process.env.NOTION_TOKEN;
   const db = (req.query.db || process.env.DEFAULT_DB_ID || "").replace(/-/g, "");
+  const showAll = req.query.all === "1";
   if (!token) return res.status(500).json({ error: "NOTION_TOKEN ontbreekt in Vercel" });
   if (!db) return res.status(400).json({ error: "Geef ?db=<database-id> mee" });
   try {
-    const r = await fetch("https://api.notion.com/v1/databases/" + db + "/query", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token, "Notion-Version": NOTION_VERSION, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        page_size: 60,
-        filter: { and: [
-          { property: "Multi-select", multi_select: { contains: "Instagram" } },
-          { property: "Date", date: { is_not_empty: true } },
-        ] },
-        sorts: [{ property: "Date", direction: "descending" }],
-      }),
-    });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data.message || "Notion-fout" });
-    const posts = data.results.map((p) => {
+    let rows = [];
+    let cursor;
+    for (let i = 0; i < 4; i++) {
+      const r = await fetch("https://api.notion.com/v1/databases/" + db + "/query", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Notion-Version": NOTION_VERSION, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page_size: 100,
+          start_cursor: cursor,
+          filter: { and: [
+            { property: "Multi-select", multi_select: { contains: "Instagram" } },
+            { property: "Date", date: { is_not_empty: true } },
+          ] },
+          sorts: [{ property: "Date", direction: "descending" }],
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) return res.status(r.status).json({ error: data.message || "Notion-fout" });
+      rows = rows.concat(data.results);
+      if (!data.has_more) break;
+      cursor = data.next_cursor;
+    }
+    let posts = rows.map((p) => {
       const pr = p.properties;
       const byName = (n) => Object.entries(pr).find(([k]) => k.trim().toLowerCase() === n)?.[1];
       const byType = (t) => Object.values(pr).find((v) => v.type === t);
@@ -40,6 +49,8 @@ module.exports = async function handler(req, res) {
         files,
       };
     });
+    if (!showAll) posts = posts.filter((p) => p.files.length > 0);
+    posts = posts.slice(0, 60);
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(200).json({ posts });
